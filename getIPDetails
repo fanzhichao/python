@@ -1,0 +1,117 @@
+import re
+import requests
+import xlsxwriter
+import xlwt
+import datetime
+import time
+if __name__ == "__main__":
+    # 打开excel表格，写好第一行标题, 有些单元格要用橙色或红色标出来，所以先设置格式
+    styleRed    = xlwt.easyxf('pattern: pattern solid, fore_colour red;')
+    styleOrange = xlwt.easyxf('pattern: pattern solid, fore_colour orange;')
+    workbook = xlwt.Workbook(encoding='utf-8')
+    worksheet = workbook.add_sheet('1')
+    worksheet.write(0, 0, label='IP')
+    worksheet.write(0, 1, label='Continent')
+    worksheet.write(0, 2, label='Country')
+    worksheet.write(0, 3, label='ISP')
+    worksheet.write(0, 4, label='Organization')
+
+    # 准备爬虫用浏览器信息
+    headers = {
+        'User-Agent': 'Mozilla/5.0(Macintosh; Intel Mac OS X 10_11_4)\
+        AppleWebKit/537.36(KHTML, like Gecko) Chrome/52 .0.2743. 116 Safari/537.36'
+    }
+
+    # 开始从文本文件中读取ip地址
+    f1=open('D:/ip.txt','r')
+    i = 0;
+    ipListOrigin=[]
+    for eachline in f1:
+        strr = re.findall(r'\d{1,3}\.\d{1,3}.\d{1,3}.\d{1,3}', eachline)
+        if len(strr):
+            for substr in strr:
+                ipListOrigin.append(substr)
+
+    f1.close()
+    print(ipListOrigin)
+
+    # 去掉文本中重复的ip地址
+    ipList = []
+    for element in ipListOrigin:
+        if (element not in ipList):
+            ipList.append(element)
+    print(ipList)
+
+    # 查询每个IP的详细信息
+    for ip in ipList:
+        i=i+1
+        #得到了一个IP地址，开始获取其详细信息并写入数据库
+        print(" "+str(i)+"/"+str(len(ipList))+" "+ip+'-----------------------------------')
+        url = 'https://www.ip-address.org/lookup/ip-locator.php?track='+ip
+        response = requests.get(url, headers=headers)
+
+        # get IP Address
+        # <th>IP Address:</th> <td class='lookup'>172.98.78.13</td>
+        regIPAdress = r'<th>IP\sAddress:</th>\s<td\sclass=\'lookup\'>(\d{1,3}\.\d{1,3}.\d{1,3}.\d{1,3})</td>'
+        reg_ques = re.compile(regIPAdress)
+        queslist = reg_ques.findall(response.text)
+        print(queslist)
+        if len(queslist) > 0:
+            worksheet.write(i, 0, label=queslist[0].replace('&nbsp;', ''))
+
+
+        # get Continent
+        # <th>Continent:</th><td class='lookup'>North America (NA)</td>
+        regContinent = r'<th>Continent:</th><td\sclass=\'lookup\'>([\d\w\s()]{2,40})</td>'
+        reg_ques = re.compile(regContinent)
+        queslist = reg_ques.findall(response.text)
+        print(queslist)
+        if len(queslist) > 0:
+            worksheet.write(i, 1, label=queslist[0].strip().replace('&nbsp;', ''))
+
+        # get Country
+        # <th>Country:</th><td> United States&nbsp;&nbsp;<img
+        # <th>Country:</th><td> Korea, Republic of&nbsp;&nbsp;<img
+        regCountry = r'<th>Country:</th><td>([\d\w\s();,&nbsp]{2,40})<img'
+        reg_ques = re.compile(regCountry)
+        queslist = reg_ques.findall(response.text)
+        print(queslist)
+        if len(queslist) > 0:
+            strLabel = label = queslist[0].strip().replace('&nbsp;', '')
+            if 'Thailand' in strLabel:
+                worksheet.write(i, 2, strLabel)
+            else:
+                worksheet.write(i, 2, strLabel,styleOrange)
+
+        # get ISP
+        # <th>ISP:</th><td class='lookup'> Total Server Solutions L.L.C.</td>
+        regISP = r'<th>ISP:</th><td\sclass=\'lookup\'>([-,\d\w\s\.()/]{2,60})</td>'
+        reg_ques = re.compile(regISP)
+        queslist = reg_ques.findall(response.text)
+        print(queslist)
+        if len(queslist)> 0:
+            strLabel = label=queslist[0].strip().replace('&nbsp;', '')
+            if  'Google' in strLabel or 'google' in strLabel:
+                worksheet.write(i, 3, strLabel, styleRed)
+            else:
+                worksheet.write(i, 3, strLabel)
+
+
+        # get Organization
+        # <th>Organization:</th><td>Total Server Solutions L.L.C.</td>
+        regOrganization = r'<th>Organization:</th><td>([-,\d\w\s()\./]{2,60})</td>'
+        reg_ques = re.compile(regOrganization)
+        queslist = reg_ques.findall(response.text)
+        print(queslist)
+        if len(queslist) > 0:
+            strLabel = label = queslist[0].strip().replace('&nbsp;', '')
+            if strLabel == 'Google':
+                worksheet.write(i, 4, strLabel, styleRed)
+            else:
+                worksheet.write(i, 4, strLabel)
+        workbook.save('D:\ip.xls')
+
+    workbook.save('D:\ip.xls')
+    
+
+
